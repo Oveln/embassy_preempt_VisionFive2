@@ -1,0 +1,9 @@
+[submodule "embassy_preempt"]
+	path = embassy_preempt
+	url = https://github.com/Oveln/embassy_preempt.git
+[submodule "opensbi"]
+	path = opensbi
+	url = https://github.com/riscv-software-src/opensbi.git
+[submodule "u-boot"]
+	path = u-boot
+	url = https://github.com/u-boot/u-boot.git
