@@ -36,7 +36,7 @@ all: opensbi uboot
 embassy:
 	@echo "Building Embassy Preempt (bin: $(EMBASSY_BIN))..."
 	cd $(EMBASSY_DIR) && \
-	cargo build -Z build-std=$(EMBASSY_BUILD_STD) \
+	RISCV_RT_BASE_ISA=rv64i cargo build -Z build-std=$(EMBASSY_BUILD_STD) \
 		--features "$(EMBASSY_FEATURES)" \
 		--target $(EMBASSY_TARGET) \
 		--bin $(EMBASSY_BIN) \
