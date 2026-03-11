@@ -15,10 +15,15 @@ EMBASSY_TARGET_DIR = $(EMBASSY_DIR)/target/$(basename $(EMBASSY_TARGET))
 EMBASSY_ELF = $(EMBASSY_TARGET_DIR)/release/$(EMBASSY_BIN)
 EMBASSY_BIN_OUT = $(EMBASSY_DIR)/$(EMBASSY_BIN).bin
 
+# SBI configuration: rustsbi or opensbi (default: rustsbi)
+SBI_TYPE ?= rustsbi
+
 # Paths
 OPENSBI_DIR = opensbi
+RUSTSBI_DIR = rustsbi
 UBOOT_DIR = u-boot
 OPENSBI_BUILD_DIR = $(OPENSBI_DIR)/build
+RUSTSBI_BUILD_DIR = $(RUSTSBI_DIR)/target
 UBOOT_BUILD_DIR = $(UBOOT_DIR)/target
 
 # OpenSBI configuration
@@ -29,8 +34,26 @@ PLATFORM ?= generic
 # OpenSBI firmware path
 OPENSBI_FIRMWARE = $(OPENSBI_BUILD_DIR)/platform/$(PLATFORM)/firmware/fw_dynamic.bin
 
+# RustSBI firmware path
+RUSTSBI_FIRMWARE = $(RUSTSBI_BUILD_DIR)/riscv64gc-unknown-none-elf/release/rustsbi-prototyper-dynamic.bin
+
+# Select firmware based on SBI_TYPE
+ifeq ($(SBI_TYPE),rustsbi)
+SBI_FIRMWARE = $(RUSTSBI_FIRMWARE)
+else
+SBI_FIRMWARE = $(OPENSBI_FIRMWARE)
+endif
+
 .PHONY: all
-all: opensbi uboot
+all: sbi uboot
+
+.PHONY: sbi
+sbi:
+	@if [ "$(SBI_TYPE)" = "rustsbi" ]; then \
+		$(MAKE) rustsbi; \
+	else \
+		$(MAKE) opensbi; \
+	fi
 
 .PHONY: embassy
 embassy:
@@ -62,6 +85,14 @@ opensbi:
 	@echo "OpenSBI build complete"
 	@echo "Firmware location: $(OPENSBI_FIRMWARE)"
 
+.PHONY: rustsbi
+rustsbi:
+	@echo "Building RustSBI..."
+	cd $(RUSTSBI_DIR) && \
+	cargo xtask prototyper
+	@echo "RustSBI build complete"
+	@echo "Firmware location: $(RUSTSBI_FIRMWARE)"
+
 .PHONY: uboot-config
 uboot-config:
 	@echo "Configuring U-Boot for VisionFive2..."
@@ -75,10 +106,10 @@ uboot-config:
 	@echo "U-Boot configuration complete"
 
 .PHONY: uboot
-uboot: uboot-config opensbi embassy
-	@echo "Building U-Boot..."
+uboot: uboot-config sbi embassy
+	@echo "Building U-Boot with $(SBI_TYPE)..."
 	cd $(UBOOT_DIR) && \
-	export OPENSBI=$(abspath $(OPENSBI_FIRMWARE)) && \
+	export OPENSBI=$(abspath $(SBI_FIRMWARE)) && \
 	export EMBASSY_PREEMPT=$(abspath $(EMBASSY_BIN_OUT)) && \
 	make $(JOBS) \
 		ARCH=riscv \
@@ -91,6 +122,8 @@ clean:
 	@echo "Cleaning OpenSBI..."
 	cd $(OPENSBI_DIR) && make clean O=build 2>/dev/null || true
 	rm -rf $(OPENSBI_BUILD_DIR)
+	@echo "Cleaning RustSBI..."
+	cd $(RUSTSBI_DIR) && cargo clean 2>/dev/null || true
 	@echo "Cleaning U-Boot..."
 	cd $(UBOOT_DIR) && make clean O=target 2>/dev/null || true
 	rm -rf $(UBOOT_BUILD_DIR)
@@ -103,6 +136,11 @@ clean-opensbi:
 	@echo "Cleaning OpenSBI..."
 	cd $(OPENSBI_DIR) && make clean O=build 2>/dev/null || true
 	rm -rf $(OPENSBI_BUILD_DIR)
+
+.PHONY: clean-rustsbi
+clean-rustsbi:
+	@echo "Cleaning RustSBI..."
+	cd $(RUSTSBI_DIR) && cargo clean 2>/dev/null || true
 
 .PHONY: clean-uboot
 clean-uboot:
@@ -119,33 +157,46 @@ clean-embassy:
 .PHONY: help
 help:
 	@echo "Available targets:"
-	@echo "  all           - Build OpenSBI and U-Boot"
-	@echo "  embassy       - Build Embassy Preempt (bin: $(EMBASSY_BIN))"
+	@echo "  all           - Build SBI (rustsbi by default) and U-Boot"
+	@echo "  sbi           - Build selected SBI (rustsbi or opensbi)"
+	@echo "  rustsbi       - Build RustSBI only"
 	@echo "  opensbi       - Build OpenSBI only"
+	@echo "  embassy       - Build Embassy Preempt (bin: $(EMBASSY_BIN))"
 	@echo "  uboot-config  - Configure U-Boot for VisionFive2"
-	@echo "  uboot         - Build U-Boot (auto-configures first, requires OpenSBI)"
+	@echo "  uboot         - Build U-Boot (auto-configures first, requires SBI)"
 	@echo "  clean         - Clean all build artifacts"
+	@echo "  clean-rustsbi - Clean RustSBI build artifacts"
 	@echo "  clean-opensbi - Clean OpenSBI build artifacts"
 	@echo "  clean-uboot   - Clean U-Boot build artifacts"
 	@echo "  clean-embassy - Clean Embassy Preempt build artifacts"
 	@echo "  help          - Show this help message"
 	@echo ""
 	@echo "Configuration variables:"
+	@echo "  SBI_TYPE        - SBI implementation: rustsbi or opensbi (default: $(SBI_TYPE))"
 	@echo "  CROSS_COMPILE   - Cross-compiler prefix (default: $(CROSS_COMPILE))"
 	@echo "  JOBS           - Number of parallel jobs (default: $(JOBS))"
 	@echo "  FW_TEXT_START  - OpenSBI text start address (default: $(FW_TEXT_START))"
 	@echo "  FW_OPTIONS     - OpenSBI firmware options (default: $(FW_OPTIONS))"
 	@echo "  EMBASSY_BIN    - Embassy binary name (default: $(EMBASSY_BIN))"
 	@echo "  EMBASSY_FEATURES- Cargo features for Embassy (default: $(EMBASSY_FEATURES))"
+	@echo ""
+	@echo "Examples:"
+	@echo "  make                    # Build with RustSBI (default)"
+	@echo "  make SBI_TYPE=opensbi   # Build with OpenSBI"
+	@echo "  make rustsbi            # Build only RustSBI"
+	@echo "  make opensbi            # Build only OpenSBI"
 
 # Print current configuration
 .PHONY: config
 config:
 	@echo "Current configuration:"
+	@echo "  SBI_TYPE: $(SBI_TYPE)"
 	@echo "  CROSS_COMPILE: $(CROSS_COMPILE)"
 	@echo "  JOBS: $(JOBS)"
 	@echo "  FW_TEXT_START: $(FW_TEXT_START)"
 	@echo "  FW_OPTIONS: $(FW_OPTIONS)"
+	@echo "  SBI Firmware: $(SBI_FIRMWARE)"
+	@echo "  RustSBI Firmware: $(RUSTSBI_FIRMWARE)"
 	@echo "  OpenSBI Firmware: $(OPENSBI_FIRMWARE)"
 	@echo "  EMBASSY_BIN: $(EMBASSY_BIN)"
 	@echo "  EMBASSY_TARGET: $(EMBASSY_TARGET)"

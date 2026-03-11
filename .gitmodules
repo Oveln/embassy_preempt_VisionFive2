@@ -7,3 +7,9 @@
 [submodule "u-boot"]
 	path = u-boot
 	url = https://github.com/Oveln/u-boot.git
+[submodule "rustsbi"]
+	path = rustsbi
+	url = git@github.com:Oveln/rustsbi.git
+[submodule "StarryOS"]
+	path = StarryOS
+	url = git@github.com:Oveln/StarryOS.git
