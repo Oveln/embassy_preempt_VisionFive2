@@ -61,6 +61,7 @@ embassy:
 	cd $(EMBASSY_DIR) && \
 	RISCV_RT_BASE_ISA=rv64i cargo build -Z build-std=$(EMBASSY_BUILD_STD) \
 		--features "$(EMBASSY_FEATURES)" \
+		-Zjson-target-spec \
 		--target $(EMBASSY_TARGET) \
 		--bin $(EMBASSY_BIN) \
 		--release

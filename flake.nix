@@ -18,16 +18,18 @@
           inherit system overlays;
         };
 
-        # Import cross-compilation packages
         riscv64Gcc = import nixpkgs {
           inherit system;
           crossSystem.config = "riscv64-unknown-linux-gnu";
         };
 
+        riscv64Musl = import nixpkgs {
+          inherit system;
+          crossSystem.config = "riscv64-unknown-linux-musl";
+        };
 
-        # Rust toolchain matching embassy_preempt/rust-toolchain.toml
-        rustToolchain = pkgs.rust-bin.nightly."2025-11-05".default.override {
-          extensions = [ "rust-src" "rustfmt" "llvm-tools" "miri" ];
+        rustToolchain = pkgs.rust-bin.nightly."2026-03-15".default.override {
+          extensions = [ "rust-src" "rustfmt" "llvm-tools" "rust-analyzer" ];
           targets = [
             "thumbv7em-none-eabi"
             "thumbv7em-none-eabihf"
@@ -42,60 +44,33 @@
       {
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
-            # Rust toolchain
             rustToolchain
-
-            # OpenOCD for debugging
             openocd
-
-            # RISC-V cross-compilation
             riscv64Gcc.buildPackages.gcc
-
-            # Build tools
-            gnumake  # Use gnumake instead of make
-            pkg-config
-            cmake
-            ninja
-            bison
-            flex
-            swig
-            openssl
-            openssl.dev
-            gnutls
-
-            # Verification tools
-            python3
-            python3Packages.pip
-            python3Packages.virtualenv
-            python3Packages.setuptools  # Needed for U-Boot build
-
-            # Git tools
+            riscv64Musl.buildPackages.gcc
+            gnumake pkg-config cmake ninja
+            bison flex swig
+            openssl openssl.dev gnutls
+            clang llvm llvmPackages.libclang libclang.lib llvmPackages.llvm.lib
+            qemu
+            python3 python3Packages.pip python3Packages.setuptools
             git
           ];
 
-          # Environment variables
-          RUST_SRC_PATH = "${rustToolchain}/lib/rustlib/src/rust/library";
-          CC = "riscv64-unknown-linux-gnu-gcc";
-          CXX = "riscv64-unknown-linux-gnu-g++";
-          AR = "riscv64-unknown-linux-gnu-ar";
-          OBJCOPY = "riscv64-unknown-linux-gnu-objcopy";
-          OBJDUMP = "riscv64-unknown-linux-gnu-objdump";
-          READELF = "riscv64-unknown-linux-gnu-readelf";
-          SIZE = "riscv64-unknown-linux-gnu-size";
+          LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
+          BINDGEN_EXTRA_CLANG_ARGS = "-I${pkgs.glibc.dev}/include -I${riscv64Musl.buildPackages.gcc.libc}/include";
 
-          # Add cross compiler to PATH
-          nativeBuildInputs = with pkgs; [
-            riscv64Gcc.buildPackages.gcc
-          ];
-
-          # Shell prompt customization
           shellHook = ''
-            export PATH="${riscv64Gcc.buildPackages.gcc}/bin:$PATH"
-            echo "Embassy Preempt VisionFive2 Development Environment"
-            echo "Rust toolchain: $(rustc --version)"
-            echo "RISC-V GCC: $(riscv64-unknown-linux-gnu-gcc --version | head -n1)"
-            echo "OpenOCD: $(openocd --version 2>&1 | head -n1)"
-          '';
+            unset OBJCOPY
+
+            # Compiler aliases for riscv64-linux-musl
+            alias riscv64-linux-musl-gcc="riscv64-unknown-linux-musl-gcc"
+            alias riscv64-linux-musl-cc="riscv64-unknown-linux-musl-gcc"
+            alias riscv64-linux-musl-g++="riscv64-unknown-linux-musl-g++"
+            alias riscv64-linux-musl-c++="riscv64-unknown-linux-musl-g++"
+
+            export LD_LIBRARY_PATH="${pkgs.llvmPackages.llvm.lib}/lib:${pkgs.llvmPackages.libclang.lib}/lib:$LD_LIBRARY_PATH"
+            '';
         };
       });
 }
