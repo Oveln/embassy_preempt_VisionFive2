@@ -13,3 +13,6 @@
 [submodule "StarryOS"]
 	path = StarryOS
 	url = git@github.com:Oveln/StarryOS.git
+[submodule "embassy_preempt_app_Visionfive2"]
+	path = embassy_preempt_app_Visionfive2
+	url = https://github.com/Oveln/embassy_preempt_app_Visionfive2.git

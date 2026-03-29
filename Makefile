@@ -6,17 +6,17 @@ NPROC ?= $(shell nproc)
 JOBS ?= -j $(NPROC)
 
 # Embassy Preempt configuration
-EMBASSY_DIR = embassy_preempt/example
+EMBASSY_DIR = embassy_preempt_app_VisionFive2
 EMBASSY_BIN ?= console
 EMBASSY_TARGET = riscv64imc-unknown-none-elf.json
 EMBASSY_FEATURES ?= jh7110
 EMBASSY_BUILD_STD = core,alloc
 EMBASSY_TARGET_DIR = $(EMBASSY_DIR)/target/$(basename $(EMBASSY_TARGET))
 EMBASSY_ELF = $(EMBASSY_TARGET_DIR)/release/$(EMBASSY_BIN)
-EMBASSY_BIN_OUT = $(EMBASSY_DIR)/$(EMBASSY_BIN).bin
+EMBASSY_BIN_OUT = $(EMBASSY_TARGET_DIR)/release/$(EMBASSY_BIN).bin
 
 # SBI configuration: rustsbi or opensbi (default: rustsbi)
-SBI_TYPE ?= rustsbi
+SBI_TYPE ?= opensbi
 
 # Paths
 OPENSBI_DIR = opensbi
@@ -49,10 +49,10 @@ all: sbi uboot
 
 .PHONY: sbi
 sbi:
-	@if [ "$(SBI_TYPE)" = "rustsbi" ]; then \
-		$(MAKE) rustsbi; \
-	else \
+	@if [ "$(SBI_TYPE)" = "opensbi" ]; then \
 		$(MAKE) opensbi; \
+	else \
+		$(MAKE) rustsbi; \
 	fi
 
 .PHONY: embassy
@@ -153,7 +153,6 @@ clean-uboot:
 clean-embassy:
 	@echo "Cleaning Embassy Preempt..."
 	cd $(EMBASSY_DIR) && cargo clean 2>/dev/null || true
-	rm -f $(EMBASSY_DIR)/*.bin
 
 .PHONY: help
 help:
@@ -182,8 +181,8 @@ help:
 	@echo "  EMBASSY_FEATURES- Cargo features for Embassy (default: $(EMBASSY_FEATURES))"
 	@echo ""
 	@echo "Examples:"
-	@echo "  make                    # Build with RustSBI (default)"
-	@echo "  make SBI_TYPE=opensbi   # Build with OpenSBI"
+	@echo "  make                    # Build with OpenSBI (default)"
+	@echo "  make SBI_TYPE=rustsbi   # Build with RustSBI"
 	@echo "  make rustsbi            # Build only RustSBI"
 	@echo "  make opensbi            # Build only OpenSBI"
 
