@@ -53,21 +53,29 @@
             openssl openssl.dev gnutls
             clang llvm llvmPackages.libclang libclang.lib llvmPackages.llvm.lib
             qemu
-            python3 python3Packages.pip python3Packages.setuptools
+            python3 python3Packages.pip python3Packages.setuptools python3Packages.pyelftools
             git
           ];
 
           LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
-          BINDGEN_EXTRA_CLANG_ARGS = "-I${pkgs.glibc.dev}/include -I${riscv64Musl.buildPackages.gcc.libc}/include";
+
+          # Use musl headers for cross-compilation bindgen
+          # Get the musl sysroot for proper includes
+          BINDGEN_EXTRA_CLANG_ARGS = "--target=riscv64-unknown-linux-musl --sysroot=${riscv64Musl.buildPackages.gcc.libc}";
 
           shellHook = ''
             unset OBJCOPY
 
-            # Compiler aliases for riscv64-linux-musl
-            alias riscv64-linux-musl-gcc="riscv64-unknown-linux-musl-gcc"
-            alias riscv64-linux-musl-cc="riscv64-unknown-linux-musl-gcc"
-            alias riscv64-linux-musl-g++="riscv64-unknown-linux-musl-g++"
-            alias riscv64-linux-musl-c++="riscv64-unknown-linux-musl-g++"
+            # Create symlinks for riscv64-linux-musl compilers in /tmp
+            SYMLINK_DIR=/tmp/nix-compiler-bin-$USER
+            mkdir -p "$SYMLINK_DIR"
+
+            ln -sf "$(command -v riscv64-unknown-linux-musl-gcc)" "$SYMLINK_DIR/riscv64-linux-musl-gcc"
+            ln -sf "$(command -v riscv64-unknown-linux-musl-gcc)" "$SYMLINK_DIR/riscv64-linux-musl-cc"
+            ln -sf "$(command -v riscv64-unknown-linux-musl-g++)" "$SYMLINK_DIR/riscv64-linux-musl-g++"
+            ln -sf "$(command -v riscv64-unknown-linux-musl-g++)" "$SYMLINK_DIR/riscv64-linux-musl-c++"
+
+            export PATH="$SYMLINK_DIR:$PATH"
 
             export LD_LIBRARY_PATH="${pkgs.llvmPackages.llvm.lib}/lib:${pkgs.llvmPackages.libclang.lib}/lib:$LD_LIBRARY_PATH"
             '';

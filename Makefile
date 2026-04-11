@@ -6,14 +6,14 @@ NPROC ?= $(shell nproc)
 JOBS ?= -j $(NPROC)
 
 # Embassy Preempt configuration
-EMBASSY_DIR = embassy_preempt_app_VisionFive2
+EMBASSY_DIR = embassy_preempt_app_Visionfive2
 EMBASSY_BIN ?= console
 EMBASSY_TARGET = riscv64imc-unknown-none-elf.json
 EMBASSY_FEATURES ?= jh7110
 EMBASSY_BUILD_STD = core,alloc
 EMBASSY_TARGET_DIR = $(EMBASSY_DIR)/target/$(basename $(EMBASSY_TARGET))
 EMBASSY_ELF = $(EMBASSY_TARGET_DIR)/release/$(EMBASSY_BIN)
-EMBASSY_BIN_OUT = $(EMBASSY_TARGET_DIR)/release/$(EMBASSY_BIN).bin
+EMBASSY_BIN_OUT = $(EMBASSY_TARGET_DIR)/release/$(EMBASSY_BIN)
 
 # SBI configuration: rustsbi or opensbi (default: rustsbi)
 SBI_TYPE ?= opensbi
@@ -65,12 +65,8 @@ embassy:
 		--target $(EMBASSY_TARGET) \
 		--bin $(EMBASSY_BIN) \
 		--release
-	@echo "Converting to binary..."
-	rust-objcopy --binary-architecture=riscv64 \
-		$(EMBASSY_ELF) \
-		-O binary $(EMBASSY_BIN_OUT)
 	@echo "Embassy Preempt build complete"
-	@echo "Binary location: $(EMBASSY_BIN_OUT)"
+	@echo "ELF location: $(EMBASSY_ELF)"
 
 .PHONY: opensbi
 opensbi:
@@ -112,6 +108,7 @@ uboot: uboot-config sbi embassy
 	cd $(UBOOT_DIR) && \
 	export OPENSBI=$(abspath $(SBI_FIRMWARE)) && \
 	export EMBASSY_PREEMPT=$(abspath $(EMBASSY_BIN_OUT)) && \
+	export SOURCE_DATE_EPOCH= &&\
 	make $(JOBS) \
 		ARCH=riscv \
 		CROSS_COMPILE=$(CROSS_COMPILE) \
