@@ -1,6 +1,6 @@
 # Makefile for Embassy Preempt VisionFive2
 
-# Configuration
+# Configiuration
 CROSS_COMPILE ?= riscv64-unknown-linux-gnu-
 NPROC ?= $(shell nproc)
 JOBS ?= -j $(NPROC)
@@ -14,6 +14,7 @@ EMBASSY_BUILD_STD = core,alloc
 EMBASSY_TARGET_DIR = $(EMBASSY_DIR)/target/$(basename $(EMBASSY_TARGET))
 EMBASSY_ELF = $(EMBASSY_TARGET_DIR)/release/$(EMBASSY_BIN)
 EMBASSY_BIN_OUT = $(EMBASSY_TARGET_DIR)/release/$(EMBASSY_BIN)
+BUILD_DIR = build
 
 # SBI configuration: rustsbi or opensbi (default: rustsbi)
 SBI_TYPE ?= opensbi
@@ -24,7 +25,7 @@ RUSTSBI_DIR = rustsbi
 UBOOT_DIR = u-boot
 OPENSBI_BUILD_DIR = $(OPENSBI_DIR)/build
 RUSTSBI_BUILD_DIR = $(RUSTSBI_DIR)/target
-UBOOT_BUILD_DIR = $(UBOOT_DIR)/target
+UBOOT_BUILD_DIR = $(UBOOT_DIR)/build
 
 # OpenSBI configuration
 FW_TEXT_START ?= 0x40000000
@@ -37,6 +38,14 @@ OPENSBI_FIRMWARE = $(OPENSBI_BUILD_DIR)/platform/$(PLATFORM)/firmware/fw_dynamic
 # RustSBI firmware path
 RUSTSBI_FIRMWARE = $(RUSTSBI_BUILD_DIR)/riscv64gc-unknown-none-elf/release/rustsbi-prototyper-dynamic.bin
 
+# U-Boot output paths
+UBOOT_ITB = $(UBOOT_BUILD_DIR)/u-boot.itb
+UBOOT_SPL = $(UBOOT_BUILD_DIR)/spl/u-boot-spl.bin.normal.out
+
+# StarryOS output paths
+STARRYOS_ELF = StarryOS/StarryOS_visionfive2.elf
+STARRYOS_BIN = StarryOS/StarryOS_visionfive2.bin
+
 # Select firmware based on SBI_TYPE
 ifeq ($(SBI_TYPE),rustsbi)
 SBI_FIRMWARE = $(RUSTSBI_FIRMWARE)
@@ -45,7 +54,7 @@ SBI_FIRMWARE = $(OPENSBI_FIRMWARE)
 endif
 
 .PHONY: all
-all: sbi uboot
+all: sbi uboot collect
 
 .PHONY: sbi
 sbi:
@@ -67,6 +76,9 @@ embassy:
 		--release
 	@echo "Embassy Preempt build complete"
 	@echo "ELF location: $(EMBASSY_ELF)"
+	@mkdir -p $(BUILD_DIR)
+	cp $(EMBASSY_ELF) $(BUILD_DIR)/$(EMBASSY_BIN).elf
+	@echo "Copied to $(BUILD_DIR)/$(EMBASSY_BIN).elf"
 
 .PHONY: opensbi
 opensbi:
@@ -81,6 +93,9 @@ opensbi:
 		O=build
 	@echo "OpenSBI build complete"
 	@echo "Firmware location: $(OPENSBI_FIRMWARE)"
+	@mkdir -p $(BUILD_DIR)
+	cp $(OPENSBI_FIRMWARE) $(BUILD_DIR)/
+	@echo "Copied to $(BUILD_DIR)/"
 
 .PHONY: rustsbi
 rustsbi:
@@ -89,6 +104,9 @@ rustsbi:
 	cargo xtask prototyper
 	@echo "RustSBI build complete"
 	@echo "Firmware location: $(RUSTSBI_FIRMWARE)"
+	@mkdir -p $(BUILD_DIR)
+	cp $(RUSTSBI_FIRMWARE) $(BUILD_DIR)/
+	@echo "Copied to $(BUILD_DIR)/"
 
 .PHONY: uboot-config
 uboot-config:
@@ -114,6 +132,22 @@ uboot: uboot-config sbi embassy
 		CROSS_COMPILE=$(CROSS_COMPILE) \
 		O=build
 	@echo "U-Boot build complete"
+	@mkdir -p $(BUILD_DIR)
+	cp $(UBOOT_ITB) $(BUILD_DIR)/
+	cp $(UBOOT_SPL) $(BUILD_DIR)/
+	@echo "Copied u-boot.itb and u-boot-spl.bin.normal.out to $(BUILD_DIR)/"
+
+.PHONY: collect
+collect:
+	@mkdir -p $(BUILD_DIR)
+	@if [ -f "$(STARRYOS_ELF)" ]; then \
+		cp $(STARRYOS_ELF) $(BUILD_DIR)/; \
+		echo "Copied $(STARRYOS_ELF) to $(BUILD_DIR)/"; \
+	fi
+	@if [ -f "$(STARRYOS_BIN)" ]; then \
+		cp $(STARRYOS_BIN) $(BUILD_DIR)/; \
+		echo "Copied $(STARRYOS_BIN) to $(BUILD_DIR)/"; \
+	fi
 
 .PHONY: clean
 clean:
@@ -128,6 +162,7 @@ clean:
 	@echo "Cleaning Embassy Preempt..."
 	cd $(EMBASSY_DIR) && cargo clean 2>/dev/null || true
 	rm -f $(EMBASSY_DIR)/*.bin
+	rm -rf $(BUILD_DIR)
 
 .PHONY: clean-opensbi
 clean-opensbi:
