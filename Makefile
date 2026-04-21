@@ -1,9 +1,12 @@
 # Makefile for Embassy Preempt VisionFive2
 
 # Configiuration
-CROSS_COMPILE ?= riscv64-unknown-linux-gnu-
+CROSS_COMPILE ?= riscv64-linux-musl-
 NPROC ?= $(shell nproc)
 JOBS ?= -j $(NPROC)
+
+# Docker configuration
+DOCKER_IMAGE ?= embassy-preempt-dev:latest
 
 # Embassy Preempt configuration
 EMBASSY_DIR = embassy_preempt_app_Visionfive2
@@ -137,6 +140,15 @@ uboot: uboot-config sbi embassy
 	cp $(UBOOT_SPL) $(BUILD_DIR)/
 	@echo "Copied u-boot.itb and u-boot-spl.bin.normal.out to $(BUILD_DIR)/"
 
+.PHONY: starryos
+starryos:
+	@echo "Building StarryOS..."
+	cd StarryOS && \
+	make vf2 LTO=true LOG=info
+	@echo "StarryOS build complete"
+	@echo "ELF location: $(STARRYOS_ELF)"
+	@echo "BIN location: $(STARRYOS_BIN)"
+
 .PHONY: collect
 collect:
 	@mkdir -p $(BUILD_DIR)
@@ -161,6 +173,8 @@ clean:
 	rm -rf $(UBOOT_BUILD_DIR)
 	@echo "Cleaning Embassy Preempt..."
 	cd $(EMBASSY_DIR) && cargo clean 2>/dev/null || true
+	@echo "Cleaning StarryOS..."
+	cd StarryOS && make clean 2>/dev/null || true
 	rm -f $(EMBASSY_DIR)/*.bin
 	rm -rf $(BUILD_DIR)
 
@@ -186,6 +200,26 @@ clean-embassy:
 	@echo "Cleaning Embassy Preempt..."
 	cd $(EMBASSY_DIR) && cargo clean 2>/dev/null || true
 
+.PHONY: clean-starryos
+clean-starryos:
+	@echo "Cleaning StarryOS..."
+	cd StarryOS && make clean 2>/dev/null || true
+
+.PHONY: docker-build
+docker-build:
+	@echo "Building Docker image $(DOCKER_IMAGE)..."
+	docker build -t $(DOCKER_IMAGE) .
+	@echo "Docker image build complete"
+
+.PHONY: docker-shell
+docker-shell:
+	@echo "Starting Docker shell..."
+	docker run -it --rm --privileged \
+		-v $(PWD):/workspace \
+		-v ~/.cargo/registry:/root/.cargo/registry \
+		-v ~/.cargo/git:/root/.cargo/git \
+		$(DOCKER_IMAGE)
+
 .PHONY: help
 help:
 	@echo "Available targets:"
@@ -196,11 +230,16 @@ help:
 	@echo "  embassy       - Build Embassy Preempt (bin: $(EMBASSY_BIN))"
 	@echo "  uboot-config  - Configure U-Boot for VisionFive2"
 	@echo "  uboot         - Build U-Boot (auto-configures first, requires SBI)"
+	@echo "  starryos/vf2  - Build StarryOS"
+	@echo "  collect       - Collect build artifacts to $(BUILD_DIR)/"
 	@echo "  clean         - Clean all build artifacts"
 	@echo "  clean-rustsbi - Clean RustSBI build artifacts"
 	@echo "  clean-opensbi - Clean OpenSBI build artifacts"
 	@echo "  clean-uboot   - Clean U-Boot build artifacts"
 	@echo "  clean-embassy - Clean Embassy Preempt build artifacts"
+	@echo "  clean-starryos- Clean StarryOS build artifacts"
+	@echo "  docker-build  - Build Docker development image"
+	@echo "  docker-shell  - Enter Docker container shell"
 	@echo "  help          - Show this help message"
 	@echo ""
 	@echo "Configuration variables:"
@@ -217,6 +256,8 @@ help:
 	@echo "  make SBI_TYPE=rustsbi   # Build with RustSBI"
 	@echo "  make rustsbi            # Build only RustSBI"
 	@echo "  make opensbi            # Build only OpenSBI"
+	@echo "  make starryos           # Build StarryOS"
+	@echo "  make vf2                # Alias for 'make starryos'"
 
 # Print current configuration
 .PHONY: config
